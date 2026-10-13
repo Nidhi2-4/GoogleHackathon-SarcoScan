@@ -1,16 +1,16 @@
 # Database
 
-Owner: Anish. Last updated: 2026-10-04.
+Owner: Anish. Last updated: 2026-10-12.
 
-PostgreSQL. Status: nine tables are defined in `backend/models.py`, tested on SQLite, and created on the team's development database (PostgreSQL 17 on Supabase), where the audit triggers were checked.
+PostgreSQL. Status: eight tables are defined in `backend/models.py`, tested on SQLite, and created on the team's development database (PostgreSQL 17 on Supabase), where the audit triggers were checked.
 
-The spec defines 14 tables (pages 14 to 20). The hackathon build has 9 of them; `reports` comes with PDF reports. Columns below follow the spec unless a note says otherwise.
+The spec defines 14 tables (pages 14 to 20). The hackathon build has 8 of them (`refresh_tokens` was removed on 2026-10-12 and is dropped at startup); `reports` comes with PDF reports. Columns below follow the spec unless a note says otherwise.
 
 ## Rules for every table
 
 - Primary keys are UUIDs, except `audit_logs`, which uses a big serial.
 - Timestamps are stored in UTC.
-- Files are never stored in the database. A `*_storage_key` column holds a path under `backend/uploads/`.
+- Files are never stored in the database. A `*_storage_key` column holds a key from `backend/storage.py`: a file name in `backend/uploads/` on a laptop, or `sarcoscan/<name>` on Cloudinary when hosted.
 - BMI is computed on the server: `weight_kg / (height_cm / 100) ** 2`.
 
 ## Tables to build first
@@ -23,19 +23,9 @@ The spec defines 14 tables (pages 14 to 20). The hackathon build has 9 of them; 
 | name | VARCHAR | |
 | email | VARCHAR, UNIQUE | |
 | password_hash | VARCHAR | argon2 |
-| role | ENUM(admin, doctor, technician) | spec also has `patient`; added with patient login |
+| role | ENUM(admin, doctor, technician) | `technician` is retired: kept so old rows load, switched off at startup, cannot be created. Spec also has `patient`, added with patient login |
 | is_active | BOOLEAN | |
 | created_at, last_login_at | TIMESTAMP | |
-
-### refresh_tokens
-
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID, PK | |
-| user_id | UUID, FK to users | |
-| token_hash | VARCHAR | never the token itself |
-| expires_at | TIMESTAMP | 7 days after issue |
-| revoked | BOOLEAN | set on rotation and on logout |
 
 ### patients
 
@@ -53,6 +43,7 @@ The spec defines 14 tables (pages 14 to 20). The hackathon build has 9 of them; 
 | consent_given | BOOLEAN | |
 | consent_at | TIMESTAMP | |
 | created_by | UUID, FK to users | |
+| doctor_id | UUID, FK to users, indexed | the patient's doctor; only that doctor sees the record (admin reads all). Empty only for patients a non-doctor registered before 2026-10-10 |
 | created_at | TIMESTAMP | |
 
 ### visits
@@ -95,7 +86,7 @@ The last three columns are the spec's `clinical_inputs` table. It is one-to-one 
 | id | UUID, PK | |
 | visit_id | UUID, FK to visits | |
 | source | not built | every study is an upload until Orthanc is added |
-| storage_key | VARCHAR | path under `backend/uploads/` |
+| storage_key | VARCHAR | key from `backend/storage.py` |
 | laterality | ENUM(left, right, unknown) | |
 | qc_passed | BOOLEAN | |
 | qc_reason | VARCHAR | why the quality check failed |
@@ -178,7 +169,7 @@ Each review is a new row. The system's result in `analysis_results` is never cha
 - visits 1 to many grip_measurements (up to 6: three trials per hand)
 - visits 1 to many xray_studies
 - xray_studies 1 to many analysis_results
-- users 1 to many refresh_tokens, visits (`performed_by`), audit_logs
+- users 1 to many visits (`performed_by`), audit_logs
 
 ## Indexes
 
@@ -190,8 +181,6 @@ Each review is a new row. The system's result in `analysis_results` is never cha
 ## Known gaps
 
 - Patient `name` and `phone` are encrypted columns, so name search happens in the application, not in SQL. It reads every patient row, which is fine for a demo and too slow for thousands of patients.
-- There are no migrations. One change is applied by hand at startup in `backend/main.py`: the phone columns became optional after the first tables were created.
+- There are no migrations. `upgrade_schema()` in `backend/db.py` runs at startup: it makes the phone columns optional (they became optional after the first tables were created), switches on row-level security for every table on PostgreSQL (see `SECURITY.md`, "Supabase's REST API"), and adds new nullable columns to existing databases.
 - The development database is reached through a connection pooler, so prepared statements are turned off in `backend/db.py`.
 - Tables are created at startup. Changing a column means dropping and recreating the table, which is acceptable only while the data is throwaway.
-
-New nullable columns are added to existing databases at startup (`backend/main.py`); there is no Alembic yet.

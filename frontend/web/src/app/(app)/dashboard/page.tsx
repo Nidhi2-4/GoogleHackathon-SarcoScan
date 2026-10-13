@@ -17,9 +17,11 @@ export default function Dashboard() {
     <>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="h1">Welcome, {user?.name}</h1>
-        <Link href="/patients/new" className="btn">
-          New patient
-        </Link>
+        {user?.role === "doctor" && (
+          <Link href="/patients/new" className="btn">
+            New patient
+          </Link>
+        )}
       </header>
 
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">

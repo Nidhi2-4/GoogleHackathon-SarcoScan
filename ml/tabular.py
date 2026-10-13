@@ -13,12 +13,15 @@ import io
 import zipfile
 from pathlib import Path
 
-import h5py
-import joblib
-import numpy as np
-import pandas as pd
-
 MODELS = Path(__file__).parent / "models"
+for _name in ("sarcopenia_ANN_1.joblib", "osteoporosis_XGBoost_1.joblib"):
+    if not (MODELS / _name).exists():  # checked before the heavy imports below
+        raise FileNotFoundError(f"ml/models/{_name} is missing")
+
+import h5py  # noqa: E402
+import joblib  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
 # joblib files run code when opened. Only load files that came from the team.
 _muscle = joblib.load(MODELS / "sarcopenia_ANN_1.joblib")

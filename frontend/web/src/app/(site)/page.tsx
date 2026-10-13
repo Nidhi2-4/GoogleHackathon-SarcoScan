@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ActivityIcon,
   BoneIcon,
-  ScanIcon,
   ShieldCheckIcon,
   SparklesIcon,
   PhoneIcon,
@@ -76,7 +75,7 @@ export default function HomePage() {
 
       <div className="space-y-24 pb-24">
 
-        {/* 2. THREE DEDICATED CLINICAL PANELS (Doctor, Technician/Nurse, Patient) */}
+        {/* 2. THREE PANELS (Doctor, Hospital admin, Patient) */}
         <section className="px-4 sm:px-8 max-w-7xl mx-auto">
           <div className="text-center space-y-3 mb-12">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-50 border border-sky-200 text-xs font-bold text-sky-700">
@@ -87,7 +86,7 @@ export default function HomePage() {
               Tailored Portals for the Entire Care Team
             </h2>
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto">
-              SarcoScan provides purpose-built interfaces for every tier of clinical operations—from radiographer intake to diagnostic sign-off and patient education.
+              SarcoScan provides purpose-built interfaces for every tier of clinical operations—from screening and diagnostic sign-off to oversight and patient education.
             </p>
           </div>
 
@@ -134,33 +133,33 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Panel 2: Technician & Nurse */}
+            {/* Panel 2: Hospital admin */}
             <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-lg shadow-sky-900/5 hover:border-sky-300 transition-all flex flex-col justify-between group">
               <div className="space-y-5">
                 <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 group-hover:scale-110 transition-transform">
-                  <ScanIcon className="w-7 h-7" />
+                  <ShieldCheckIcon className="w-7 h-7" />
                 </div>
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600 block mb-1">
-                    Intake &amp; Radiography Station
+                    Oversight &amp; Access Control
                   </span>
-                  <h3 className="text-xl font-bold text-slate-900">Technician / Nurse Station</h3>
+                  <h3 className="text-xl font-bold text-slate-900">Hospital Admin Console</h3>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Streamlined 10-second intake interface. Drag-and-drop routine knee AP radiographs, log 3-trial BLE dynamometer force, and run automated image QC checks.
+                  Admins create and switch off doctor accounts, read every screening without changing it, and follow every access in an append-only audit log.
                 </p>
                 <ul className="space-y-2 text-xs text-slate-700">
                   <li className="flex items-center gap-2">
                     <CheckCircleIcon className="w-4 h-4 text-sky-600 shrink-0" />
-                    <span>Rapid DICOM drag &amp; drop / PACS sync</span>
+                    <span>Each doctor sees only their own patients</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircleIcon className="w-4 h-4 text-sky-600 shrink-0" />
-                    <span>BLE digital handgrip dynamometer pairing</span>
+                    <span>Each doctor sees only their own patients</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircleIcon className="w-4 h-4 text-sky-600 shrink-0" />
-                    <span>Automated knee AP crop &amp; exposure validation</span>
+                    <span>Audit log of who opened or changed what</span>
                   </li>
                 </ul>
               </div>
@@ -169,7 +168,7 @@ export default function HomePage() {
                   href="/login"
                   className="inline-flex items-center gap-2 text-xs font-bold text-sky-600 hover:text-sky-700"
                 >
-                  <span>Launch Nurse Station</span>
+                  <span>Open Admin Console</span>
                   <ArrowRightIcon className="w-3.5 h-3.5" />
                 </Link>
               </div>

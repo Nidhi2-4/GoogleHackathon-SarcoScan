@@ -6,7 +6,7 @@ import { StageBadge, byDateDesc } from "@/components/app";
 import { finalStage, useStore } from "@/lib/store";
 
 export default function Patients() {
-  const { patients, screenings } = useStore();
+  const { user, patients, screenings } = useStore();
   const [q, setQ] = useState("");
   const rows = patients.filter((p) => `${p.name} ${p.mrn} ${p.phone ?? ""}`.toLowerCase().includes(q.toLowerCase()));
 
@@ -14,9 +14,11 @@ export default function Patients() {
     <>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="h1">Patients</h1>
-        <Link href="/patients/new" className="btn">
-          New patient
-        </Link>
+        {user?.role === "doctor" && (
+          <Link href="/patients/new" className="btn">
+            New patient
+          </Link>
+        )}
       </header>
       <input
         type="search"

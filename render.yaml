@@ -1,0 +1,33 @@
+# Render blueprint: the API only. The web app is on Vercel (root directory frontend/web).
+# In Render: New > Blueprint > pick this repo. Then fill in the values marked "sync: false".
+# Steps and limits are in docs/DEPLOY.md.
+
+services:
+  - type: web
+    name: sarcoscan-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # The free plan has 512 MB of memory; all four models need about 670 MB. "tabular" fits.
+      # With more memory use "xray,tabular". See docs/DEPLOY.md.
+      - key: SARCOSCAN_MODELS
+        value: tabular
+      - key: STORAGE_BACKEND
+        value: cloudinary
+      # Copy these from .env.prod. They are typed into Render, never committed.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FIELD_KEY
+        sync: false
+      - key: HASH_KEY
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false

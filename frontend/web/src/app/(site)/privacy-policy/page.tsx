@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
             <h3>Audit-Logged Access</h3>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Role-based access controls strictly separate technician data entry from doctor review and clinician overrides with immutable audit logs.
+            Each doctor sees only their own patients. Admins can read records but not change them, and every access is written to an append-only audit log.
           </p>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Medical Imaging:</strong> Standard knee anterior-posterior (AP) radiographs in DICOM, PNG, or JPEG formats.</li>
             <li><strong>Biomechanical Metrics:</strong> Handgrip dynamometer force measurements (3 trials per hand recorded via manual entry or BLE).</li>
             <li><strong>Demographics & Anthropometrics:</strong> Patient age, biological sex, height, weight, calculated BMI, and optional clinical scores.</li>
-            <li><strong>System Audit Metrics:</strong> Doctor override notes, timestamped visit history, and technician operator IDs.</li>
+            <li><strong>System Audit Metrics:</strong> Doctor override notes, timestamped visit history, and the staff ID behind every action.</li>
           </ul>
         </section>
 

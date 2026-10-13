@@ -2,7 +2,7 @@
 
 Owner: Anish. The FastAPI app, the database models, and every security check.
 
-Status on 2026-10-04: login, patients, the screening flow, doctor review, and the audit log are written, pass 11 tests on SQLite, and run against the team's PostgreSQL database. The web app uses them. The ML model is not connected. The PDF report is made in the web app.
+Status on 2026-10-09: login, patients, the screening flow, doctor review, staff accounts and the audit log are written, pass 13 tests on SQLite, and run on Render against the team's PostgreSQL database. The models in `ml/` are called from `analysis.py`; `SARCOSCAN_MODELS` chooses which load. The PDF report is made in the web app.
 
 Read before changing anything: [API](../docs/API.md), [Database](../docs/DATABASE.md), [Security](../docs/SECURITY.md).
 
@@ -10,56 +10,45 @@ Read before changing anything: [API](../docs/API.md), [Database](../docs/DATABAS
 
 ```
 backend/
-├── main.py            app object, includes the routers, creates tables at startup
-├── config.py          settings from .env
-├── db.py              engine and session
+├── main.py            app object, routers, startup (tables, schema upgrades, model loading)
+├── config.py          settings from .env (ENV_FILE picks another file)
+├── db.py              engine, session, get_or_404, schema upgrades
 ├── models.py          SQLAlchemy tables and the append-only triggers for audit_logs
 ├── schemas.py         Pydantic request and response models
 ├── crypto.py          AES-256-GCM column type for name and phone, and the phone hash
-├── security.py        password hashing, tokens, role and audit dependencies, login rate limit
-├── analysis.py        cutoffs, the sarcopenia stage rule, the call into ml/predict.py
-├── storage.py         save and find uploaded files
+├── security.py        password hashing, the login token, role and audit dependencies
+├── analysis.py        AWGS cutoffs, the sarcopenia stage rule, calls into ml/predict.py and ml/tabular.py
+├── xray_checks.py     an upload's real file type, and whether it looks like an X-ray
+├── storage.py         uploaded files: Cloudinary when hosted, backend/uploads/ on a laptop
 ├── routers/
-│   ├── auth.py        login, refresh, logout, me
+│   ├── auth.py        signup, login, me
 │   ├── patients.py    register, list and search, details
 │   ├── visits.py      visit, inputs, grip, X-ray, analyze, result, review, history, files
-│   └── admin.py       audit log
-├── seed.py            creates the first admin, doctor, and technician
+│   └── admin.py       audit log, staff accounts
+├── seed.py            creates the first admin and doctor, and the demo doctor at startup
 ├── tests/test_api.py
-├── requirements.txt
-└── uploads/           X-rays and overlays at runtime (ignored by git)
+├── requirements.txt   the only Python package list
+├── package.json       build and start commands for Render (its root directory is backend/)
+└── uploads/           X-rays and overlays on a laptop only (created on first upload, ignored by git)
 ```
 
 ## Setup
 
-Run everything from the repo root, so that both `backend` and `ml` can be imported.
+From the repo root, `npm run setup` does everything once: it creates `.venv`, installs `backend/requirements.txt`, writes a local `.env` (SQLite, fresh keys, random seed passwords) if there is none, and creates the seed users. Then `npm run dev` starts this API on port 8000 together with the web app.
+
+Run any Python command from the repo root, so that both `backend` and `ml` can be imported.
+
+By hand, without npm:
 
 ```
 python -m venv .venv
-python -m pip --python .venv\Scripts\python.exe install -r backend/requirements.txt
-.venv\Scripts\activate
+.venv\Scripts\python -m pip install -r requirements.txt
+copy .env.example .env        # then fill it in
+.venv\Scripts\python -m backend.seed
+.venv\Scripts\python -m uvicorn backend.main:app --reload
 ```
 
-The second line installs into the new environment with your main Python's pip. A fresh environment ships an old pip, and on this network that old pip fails with a certificate error.
-
-Copy `.env.example` to `.env` and fill it in. The file explains how to generate each secret.
-
-`DATABASE_URL` can point at any PostgreSQL. Three options:
-
-- A hosted database such as Supabase (what the team uses for development). Pick a region near you: every query crosses the network, and a far region makes each page slow.
-- A local container: `docker run --name sarcoscan-db -e POSTGRES_DB=sarcoscan -e POSTGRES_PASSWORD=change-me -p 5432:5432 -d postgres:15`
-- No database server at all, for a quick local run: `DATABASE_URL=sqlite:///./sarcoscan.db?check_same_thread=false`
-
-The server takes a few seconds to start with a hosted database, and `--reload` restarts it on every file save. If the web app cannot sign in, check that http://localhost:8000/api/v1/health answers.
-
-Create the first three users (passwords come from `.env`), then start the API:
-
-```
-python -m backend.seed
-uvicorn backend.main:app --reload
-```
-
-The generated API page is at http://localhost:8000/docs. Use "Authorize" there with the access token from `/auth/login`.
+A new virtual environment ships an old pip, which fails on some networks with a certificate error. Then install with the main Python's pip instead: `python -m pip --python .venv\Scripts\python.exe install -r requirements.txt` (`npm run setup` retries this way on its own).
 
 Two settings files, both ignored by git:
 
@@ -68,7 +57,7 @@ Two settings files, both ignored by git:
 
 The two files have different encryption keys, so a patient saved in one database cannot be read with the other file.
 
-Seed logins: `admin@sarcoscan.local`, `doctor@sarcoscan.local`, `technician@sarcoscan.local`.
+Seed logins: `admin@sarcoscan.local`, `doctor@sarcoscan.local`.
 
 ## Tests
 
@@ -80,8 +69,8 @@ They use a temporary SQLite file and their own keys, so they need neither Postgr
 
 ## Calling the model
 
-`backend/analysis.py` imports `analyze` from `ml/predict.py`. Its arguments and return values are listed in [ML](../docs/ML.md) under "Handing models to the backend". Until that file exists, the analyze endpoint still works: it stores the rule-based sarcopenia stage and leaves the image-based fields empty.
+`backend/analysis.py` imports `analyze` from `ml/predict.py` (X-ray models) and the functions in `ml/tabular.py` (body-measurement models). Arguments and return values are in [ML](../docs/ML.md) under "Handing models to the backend". When a model is switched off with `SARCOSCAN_MODELS` or cannot load, the analyze endpoint still works: it stores the rule-based stage and leaves that model's fields empty.
 
 ## Packages to add with their features
 
-`reportlab` for the PDF report. The spec also names WeasyPrint, but on Windows it needs extra system libraries (Pango) that `pip` does not install. `pydicom` if DICOM upload is supported.
+`pydicom` if DICOM upload is supported.

@@ -12,7 +12,6 @@ os.environ.update(
     FIELD_KEY=base64.b64encode(os.urandom(32)).decode(),
     HASH_KEY=base64.b64encode(os.urandom(32)).decode(),
     UPLOAD_DIR=str(_db_file.parent / "uploads"),
-    COOKIE_SECURE="true",  # set here so a developer's own .env cannot change what the tests check
 )
 
 import io  # noqa: E402
@@ -34,7 +33,7 @@ from backend.models import Role, Stage, User  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
 LOGIN = "/api/v1/auth/login"
-REFRESH = "/api/v1/auth/refresh"
+SIGNUP = "/api/v1/auth/signup"
 PATIENT = {
     "mrn": "MRN-00412",
     "name": "Kamala Deshpande",
@@ -51,20 +50,13 @@ PATIENT = {
 def client():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    security._login_attempts.clear()
     with SessionLocal() as db:
-        for role in Role:
-            db.add(
-                User(
-                    name=role.value,
-                    email=f"{role.value}@test.local",
-                    password_hash=security.hash_password(PASSWORD),
-                    role=role,
-                )
-            )
+        # Two doctors to check that neither sees the other's patients; a technician from before the role was retired.
+        for name, role in (("admin", Role.admin), ("doctor", Role.doctor), ("doctor2", Role.doctor),
+                           ("technician", Role.technician)):
+            db.add(User(name=name, email=f"{name}@test.local", password_hash=security.hash_password(PASSWORD), role=role))
         db.commit()
-    # https, so the client sends the Secure refresh cookie back.
-    with TestClient(app, base_url="https://testserver") as test_client:
+    with TestClient(app) as test_client:
         yield test_client
 
 
@@ -74,53 +66,46 @@ def login(client, role):
     return {"Authorization": "Bearer " + response.json()["access_token"]}
 
 
-def test_login_sets_a_locked_down_refresh_cookie(client):
-    response = client.post(LOGIN, json={"email": "technician@test.local", "password": PASSWORD})
-    cookie = response.headers["set-cookie"].lower()
-    for part in ("httponly", "secure", "samesite=strict", "path=/api/v1/auth"):
-        assert part in cookie
+def test_login_returns_a_token_and_no_cookie(client):
+    response = client.post(LOGIN, json={"email": "doctor@test.local", "password": PASSWORD})
+    assert "set-cookie" not in response.headers
     headers = {"Authorization": "Bearer " + response.json()["access_token"]}
-    assert client.get("/api/v1/auth/me", headers=headers).json()["role"] == "technician"
+    assert client.get("/api/v1/auth/me", headers=headers).json()["role"] == "doctor"
+    assert client.get("/api/v1/auth/me", headers={"Authorization": "Bearer nonsense"}).status_code == 401
+
+
+def test_signup_makes_a_doctor_who_starts_with_no_patients(client):
+    assert client.post("/api/v1/patients", json=PATIENT, headers=login(client, "doctor")).status_code == 201
+    new = {"name": "New Doctor", "email": "New@Test.local", "password": "x", "role": "admin"}  # role is ignored
+    created = client.post(SIGNUP, json=new)
+    assert created.status_code == 201, created.text
+    headers = {"Authorization": "Bearer " + created.json()["access_token"]}
+    me = client.get("/api/v1/auth/me", headers=headers).json()
+    assert (me["email"], me["role"]) == ("new@test.local", "doctor")
+    assert client.get("/api/v1/patients", headers=headers).json() == []
+    assert client.post(SIGNUP, json=new).status_code == 409
+    assert client.post(LOGIN, json={"email": "new@test.local", "password": "x"}).status_code == 200
+
+
+def test_the_demo_doctor_exists_after_startup(client):
+    assert client.post(LOGIN, json={"email": "demo1@doctor.com", "password": "demo@123"}).status_code == 200
 
 
 def test_wrong_password_and_unknown_email_look_the_same(client):
-    wrong = client.post(LOGIN, json={"email": "technician@test.local", "password": "nope"})
+    wrong = client.post(LOGIN, json={"email": "doctor@test.local", "password": "nope"})
     unknown = client.post(LOGIN, json={"email": "nobody@test.local", "password": "nope"})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.json() == unknown.json()
 
 
-def test_refresh_rotates_and_reuse_signs_out_everywhere(client):
-    login(client, "doctor")
-    old = client.cookies.get("refresh_token")
-    assert client.post(REFRESH).status_code == 200
-    assert client.cookies.get("refresh_token") != old
-
-    thief = TestClient(app, base_url="https://testserver")
-    thief.cookies.set("refresh_token", old)
-    assert thief.post(REFRESH).status_code == 401
-    # The replayed token revoked the doctor's current token as well.
-    assert client.post(REFRESH).status_code == 401
-
-
-def test_logout_revokes_the_refresh_token(client):
-    login(client, "doctor")
-    token = client.cookies.get("refresh_token")
-    assert client.post("/api/v1/auth/logout").status_code == 204
-    other = TestClient(app, base_url="https://testserver")
-    other.cookies.set("refresh_token", token)
-    assert other.post(REFRESH).status_code == 401
-
-
 def test_only_admin_reads_the_audit_log(client):
     assert client.get("/api/v1/audit-logs").status_code == 401
-    assert client.get("/api/v1/audit-logs", headers=login(client, "technician")).status_code == 403
     assert client.get("/api/v1/audit-logs", headers=login(client, "doctor")).status_code == 403
     assert client.get("/api/v1/audit-logs", headers=login(client, "admin")).status_code == 200
 
 
 def test_patient_is_encrypted_at_rest_and_still_searchable(client):
-    headers = login(client, "technician")
+    headers = login(client, "doctor")
     created = client.post("/api/v1/patients", json=PATIENT, headers=headers)
     assert created.status_code == 201, created.text
     assert created.json()["name"] == "Kamala Deshpande"
@@ -145,7 +130,7 @@ def test_consent_is_required(client):
 
 
 def test_audit_log_records_ids_not_names(client):
-    headers = login(client, "technician")
+    headers = login(client, "doctor")
     patient_id = client.post("/api/v1/patients", json=PATIENT, headers=headers).json()["id"]
     client.get(f"/api/v1/patients/{patient_id}", headers=headers)
 
@@ -172,22 +157,22 @@ def test_sarcopenia_stage_rule():
 
 
 def test_screening_flow_from_visit_to_review(client, monkeypatch):
-    technician = login(client, "technician")
-    patient_id = client.post("/api/v1/patients", json=PATIENT, headers=technician).json()["id"]
-    visit = client.post(f"/api/v1/patients/{patient_id}/visits", headers=technician).json()
+    doctor = login(client, "doctor")
+    patient_id = client.post("/api/v1/patients", json=PATIENT, headers=doctor).json()["id"]
+    visit = client.post(f"/api/v1/patients/{patient_id}/visits", headers=doctor).json()
     assert visit["bmi"] == 21.4
     base = f"/api/v1/visits/{visit['id']}"
 
     def upload(content):
-        return client.post(f"{base}/xray", files={"file": ("knee.png", content, "image/png")}, headers=technician)
+        return client.post(f"{base}/xray", files={"file": ("knee.png", content, "image/png")}, headers=doctor)
 
-    assert client.post(f"{base}/analyze", headers=technician).status_code == 409  # no X-ray yet
+    assert client.post(f"{base}/analyze", headers=doctor).status_code == 409  # no X-ray yet
     bad_history = {"sarcf_score": 5, "history": {"owns_a_cat": True}}
-    assert client.post(f"{base}/clinical-inputs", json=bad_history, headers=technician).status_code == 422
+    assert client.post(f"{base}/clinical-inputs", json=bad_history, headers=doctor).status_code == 422
     inputs = {"sarcf_score": 5, "chair_stand_5_sec": 10.6, "waist_cm": 78, "history": {"steroid_use": True}}
-    assert client.post(f"{base}/clinical-inputs", json=inputs, headers=technician).status_code == 200
+    assert client.post(f"{base}/clinical-inputs", json=inputs, headers=doctor).status_code == 200
     readings = {"left": [15.2, 15.8, 15.5], "right": [16.0, 16.4, 16.1]}
-    grip = client.post(f"{base}/grip", json=readings, headers=technician).json()
+    grip = client.post(f"{base}/grip", json=readings, headers=doctor).json()
     assert grip == {"best_left": 15.8, "best_right": 16.4, "best_kg": 16.4, "cutoff_kg": 18.0, "low": True}
 
     assert upload(b"not an image at all").status_code == 415
@@ -197,7 +182,7 @@ def test_screening_flow_from_visit_to_review(client, monkeypatch):
         buffer = io.BytesIO()
         not_an_xray.save(buffer, format="PNG")
         assert upload(buffer.getvalue()).json()["qc_passed"] is False
-    assert client.post(f"{base}/analyze", headers=technician).status_code == 409  # only a failed image so far
+    assert client.post(f"{base}/analyze", headers=doctor).status_code == 409  # only a failed image so far
     good_bytes = png()
     xray = upload(good_bytes).json()
     assert xray["qc_passed"] is True
@@ -206,26 +191,26 @@ def test_screening_flow_from_visit_to_review(client, monkeypatch):
     seen = {}
     fake = {"low_muscle": True, "low_muscle_prob": 0.9, "bone_loss": True, "bone_loss_prob": 0.7}
     monkeypatch.setattr("backend.routers.visits.run_tabular_models", lambda *a: seen.update(args=a) or fake)
-    with_models = client.post(f"{base}/analyze", headers=technician).json()
+    with_models = client.post(f"{base}/analyze", headers=doctor).json()
     assert with_models["sarcopenia_stage"] == "probable" and with_models["low_muscle"] is True
     assert with_models["bone_loss"] is True and with_models["bone_loss_prob"] == 0.7
     assert seen["args"][5:] == (78, None, 15.8, 16.4, {"steroid_use": True})  # waist, arm, grips, history
     monkeypatch.undo()
 
-    result = client.post(f"{base}/analyze", headers=technician).json()
+    result = client.post(f"{base}/analyze", headers=doctor).json()
     assert result["sarcopenia_stage"] == "possible"  # low grip, and no muscle evidence without the models
     assert result["low_muscle"] is None and result["history"] == {"steroid_use": True}
     assert result["model_connected"] is False and result["osteoporosis_tier"] is None
     assert result["sarcf_positive"] is True and result["chair_stand_slow"] is False
 
     image_url = f"/api/v1/xrays/{xray['id']}/image"
-    assert client.get(image_url, headers=technician).content == good_bytes
+    assert client.get(image_url, headers=doctor).content == good_bytes
     assert client.get(image_url).status_code == 401
-    assert client.get(f"/api/v1/xrays/{xray['id']}/overlay", headers=technician).status_code == 404
+    assert client.get(f"/api/v1/xrays/{xray['id']}/overlay", headers=doctor).status_code == 404
 
     decision = {"agrees_with_ai": False, "final_stage": "probable", "notes": "Refer for DEXA."}
-    assert client.post(f"{base}/review", json=decision, headers=technician).status_code == 403
-    doctor = login(client, "doctor")
+    admin = login(client, "admin")
+    assert client.post(f"{base}/review", json=decision, headers=admin).status_code == 403  # admin only reads
     assert client.post(f"{base}/review", json=decision, headers=doctor).status_code == 201
     final = client.get(f"{base}/result", headers=doctor).json()
     assert final["status"] == "reviewed"
@@ -237,19 +222,25 @@ def test_screening_flow_from_visit_to_review(client, monkeypatch):
     ]
     visits = client.get("/api/v1/visits", headers=doctor).json()
     assert [(v["visit_id"], v["performed_by_name"], v["reviewed_by_name"]) for v in visits] == [
-        (visit["id"], "technician", "doctor")
+        (visit["id"], "doctor", "doctor")
     ]
+    assert client.head("/api/v1/ping").status_code == 200 and client.get("/api/v1/ping").json() == {"status": "ok"}
     assert client.get("/api/v1/health").json() == {
-        "status": "ok", "model_connected": False, "tabular_connected": False,
+        "status": "ok", "model_connected": False, "tabular_connected": False, "storage": "local",
     }
-    admin = login(client, "admin")
     assert client.post(f"/api/v1/patients/{patient_id}/visits", headers=admin).status_code == 403
+    assert client.post("/api/v1/patients", json={**PATIENT, "mrn": "MRN-9"}, headers=admin).status_code == 403
+    assert client.get(f"{base}/result", headers=admin).status_code == 200  # but may read every patient
+    assert [p["id"] for p in client.get("/api/v1/patients", headers=admin).json()] == [patient_id]
 
-
-def test_login_is_rate_limited(client):
-    for _ in range(5):
-        assert client.post(LOGIN, json={"email": "nobody@test.local", "password": "nope"}).status_code == 401
-    assert client.post(LOGIN, json={"email": "nobody@test.local", "password": "nope"}).status_code == 429
+    # Another doctor cannot see this patient at all: same answer as for a patient that does not exist.
+    other = login(client, "doctor2")
+    assert client.get("/api/v1/patients", headers=other).json() == []
+    assert client.get("/api/v1/visits", headers=other).json() == []
+    for url in (f"/api/v1/patients/{patient_id}", f"/api/v1/patients/{patient_id}/history", f"{base}/result", image_url):
+        assert client.get(url, headers=other).status_code == 404, url
+    assert client.post(f"{base}/grip", json=readings, headers=other).status_code == 404
+    assert client.post(f"/api/v1/patients/{patient_id}/visits", headers=other).status_code == 404
 
 
 def test_client_ip_trusts_only_the_local_proxy():
@@ -264,3 +255,60 @@ def test_client_ip_trusts_only_the_local_proxy():
     assert client_ip(request("127.0.0.1", "9.9.9.9, 10.0.0.7")) == "10.0.0.7"  # last entry: the one our proxy added
     assert client_ip(request("203.0.113.5", "1.2.3.4")) == "203.0.113.5"  # a direct caller cannot pick its address
     assert client_ip(request("127.0.0.1", "")) == "127.0.0.1"
+
+
+def test_only_admin_manages_users(client):
+    new = {"name": "New Doctor", "email": "Doc@Test.local", "role": "doctor", "password": "a-long-password"}
+    assert client.post("/api/v1/users", json=new, headers=login(client, "doctor")).status_code == 403
+    assert client.get("/api/v1/users", headers=login(client, "doctor")).status_code == 403
+    assert client.post("/api/v1/users", json=new).status_code == 401
+
+    admin = login(client, "admin")
+    assert client.post("/api/v1/users", json={**new, "password": ""}, headers=admin).status_code == 422
+    assert client.post("/api/v1/users", json={**new, "role": "technician"}, headers=admin).status_code == 422  # retired
+    created = client.post("/api/v1/users", json=new, headers=admin)
+    assert created.status_code == 201 and created.json()["email"] == "doc@test.local"
+    assert "password" not in created.text
+    assert client.post("/api/v1/users", json=new, headers=admin).status_code == 409
+
+    credentials = {"email": "doc@test.local", "password": "a-long-password"}
+    assert client.post(LOGIN, json=credentials).status_code == 200
+    user_id = created.json()["id"]
+    assert client.patch(f"/api/v1/users/{user_id}", json={"is_active": False}, headers=admin).status_code == 200
+    assert client.post(LOGIN, json=credentials).status_code == 401  # switched off
+
+    me = next(u for u in client.get("/api/v1/users", headers=admin).json() if u["role"] == "admin")
+    assert client.patch(f"/api/v1/users/{me['id']}", json={"is_active": False}, headers=admin).status_code == 409
+
+
+def test_retired_technician_cannot_sign_in(client):
+    assert client.post(LOGIN, json={"email": "technician@test.local", "password": PASSWORD}).status_code == 401
+
+
+def test_cloudinary_storage_is_private_and_keeps_nothing_on_disk(monkeypatch):
+    """With STORAGE_BACKEND=cloudinary: uploads are "authenticated" (never public), reads use a signed URL,
+    and nothing is written to the uploads folder. Cloudinary itself is replaced by a fake here."""
+    from types import SimpleNamespace
+
+    from backend import storage
+    from backend.config import settings
+
+    uploads, urls = [], []
+    fake = SimpleNamespace(
+        uploader=SimpleNamespace(upload=lambda source, **kw: uploads.append((source.read(), kw))),
+        utils=SimpleNamespace(cloudinary_url=lambda public_id, **kw: urls.append((public_id, kw)) or ("https://x", {})),
+    )
+    monkeypatch.setattr(storage, "_cloud", True)
+    monkeypatch.setattr(storage, "cloudinary", fake, raising=False)
+    monkeypatch.setattr(storage.urllib.request, "urlopen", lambda url, timeout: io.BytesIO(b"image bytes"))
+    before = set(settings.upload_dir.glob("*")) if settings.upload_dir.exists() else set()
+
+    key = storage.save(io.BytesIO(b"image bytes"), ".png")
+    assert uploads == [(b"image bytes", {"public_id": f"sarcoscan/{key[:-4]}", "resource_type": "image",
+                                         "type": "authenticated"})]
+    with storage.working_copy(key) as copy:
+        assert copy.read_bytes() == b"image bytes"
+    assert not copy.exists()  # the temporary copy is gone
+    assert urls[0][1]["type"] == "authenticated" and urls[0][1]["sign_url"] is True
+    after = set(settings.upload_dir.glob("*")) if settings.upload_dir.exists() else set()
+    assert after == before

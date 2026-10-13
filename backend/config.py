@@ -32,12 +32,10 @@ class Settings:
     jwt_secret: str
     field_key: bytes  # AES-256-GCM key for patient name and phone
     hash_key: bytes  # HMAC key for the searchable phone hash
-    cookie_secure: bool
     upload_dir: Path  # X-rays and overlays; never served as static files
     storage_backend: str = "local"
     cloudinary_url: str = ""
-    access_minutes: int = 15
-    refresh_days: int = 7
+    token_days: int = 7  # how long a login lasts
 
 
 def _load() -> Settings:
@@ -49,7 +47,6 @@ def _load() -> Settings:
         jwt_secret=secret,
         field_key=_key("FIELD_KEY"),
         hash_key=_key("HASH_KEY"),
-        cookie_secure=os.environ.get("COOKIE_SECURE", "true").lower() != "false",
         upload_dir=Path(os.environ.get("UPLOAD_DIR") or Path(__file__).parent / "uploads"),
         storage_backend=os.environ.get("STORAGE_BACKEND", "local").lower(),
         cloudinary_url=os.environ.get("CLOUDINARY_URL", ""),

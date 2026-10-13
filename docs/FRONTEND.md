@@ -1,6 +1,6 @@
 # Frontend: web, mobile, desktop
 
-Owner: Nidhi. Last updated: 2026-10-04.
+Owner: Nidhi. Last updated: 2026-10-12.
 
 Status: the web app in `frontend/web/` is built and talks to the backend. It builds cleanly, and the whole screening flow was run through it against a test backend. Anish clicked through it in a browser on 2026-10-04, including the PDF download with the X-ray. No automated browser check exists.
 
@@ -33,7 +33,7 @@ frontend/web/
 │       └── studies, analytics, admin, settings
 ├── src/components/app.tsx    badges, tables, Findings, XrayImage, ModelStatus
 └── src/lib/
-    ├── api.ts                calls to the backend, login token, refresh
+    ├── api.ts                calls to the backend, login token
     ├── store.ts              the data every page reads, and the actions that change it
     └── pdfReport.ts          the PDF report: findings on page 1, the X-ray on page 2
 ```
@@ -42,12 +42,12 @@ frontend/web/
 
 - Every page reads from `useStore()` in `store.ts`. The store holds what the backend returned: the user, patients, analysed visits, the audit log (admins only), and whether a model is connected.
 - Pages change data only through the store's actions (`signIn`, `registerPatient`, `saveInputs`, `uploadXray`, `runAnalysis`, `reviewScreening`). Each action calls the backend and then reloads the store.
-- Nothing about a patient is written to `localStorage` or any other browser storage. A page reload fetches everything again.
+- Nothing about a patient is written to `localStorage` or any other browser storage (only the login token is). A page reload fetches everything again.
 - The store's types use short names (`heightCm`, `M`/`F`/`O`); `store.ts` converts to and from the backend's names in one place.
 
 ### Talking to the backend
 
-The browser never calls the backend's address directly. Next.js forwards `/api` to it (`next.config.ts`), so the UI and the API share one origin. This keeps CORS closed and makes the login cookie work (`SECURITY.md`, section 3).
+The browser never calls the backend's address directly. Next.js forwards `/api` to it (`next.config.ts`), so the UI and the API share one origin. This keeps CORS closed (`SECURITY.md`, section 3).
 
 `BACKEND_URL` is read when the app is built. Set it before `npm run build` if the backend is not at `http://127.0.0.1:8000`.
 
@@ -55,17 +55,19 @@ In the UI, always call relative paths through `api.ts`. Never hard-code a host o
 
 ### Login on the client
 
-1. `signIn` posts to `/api/v1/auth/login` and keeps the access token in a variable in `api.ts`. It is never put in browser storage.
-2. The backend sets the refresh cookie. The UI never reads or writes it.
-3. On a 401, `api.ts` calls refresh once and repeats the request. Calls made at the same moment share one refresh, because the backend treats a second use of an old refresh token as theft.
-4. After a page reload the token in memory is gone, so the store calls refresh at start.
+Simple on purpose since 2026-10-12, while the build is for testing (`SECURITY.md`, section 2).
+
+1. `signIn` posts to `/api/v1/auth/login`, `signUp` to `/api/v1/auth/signup` (the sign-in page has both). `api.ts` saves the returned token in `localStorage`.
+2. Every call sends the token. On a 401, `api.ts` deletes it and opens the sign-in page.
+3. After a page reload the store finds the saved token and loads the data again. The token lasts 7 days.
+4. Logging out deletes the token.
 5. Menu items a role cannot use are hidden. That is for convenience; the backend still refuses the call.
 
 ## The PDF report
 
 `pdfReport.ts` builds it in the browser from what the backend stored. Page 1 has the letterhead (hospital on the left, SarcoScan on the right), the patient box, the two results, the measured values next to their cutoffs, the suggested action, the doctor's note, and who screened and reviewed. Page 2 has the X-ray.
 
-The hospital name and address are typed on the sign-in page and remembered in that browser (`localStorage`; they are a device setting, not patient data). Without a name the report says "Demo Hospital". The seed-account buttons fill in a made-up hospital. There is no hospital logo, only the name.
+The hospital name and address are typed on the Settings page and remembered in that browser (`localStorage`; they are a device setting, not patient data). Without a name the report says "Demo Hospital". There is no hospital logo, only the name.
 
 ## The screening flow
 

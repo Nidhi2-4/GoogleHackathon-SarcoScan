@@ -1,3 +1,6 @@
+# CPU builds of torch. Without this line Linux installs the GPU build, which is several GB.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi>=0.115
 uvicorn[standard]>=0.30
 sqlalchemy>=2.0
@@ -13,13 +16,15 @@ pillow>=10
 pytest>=8
 httpx2>=2
 
-# Needed by ml/predict.py
-torch>=2.0.0
-torchvision>=0.15.0
+# Needed by ml/predict.py. Pinned: a newer torchvision may build DenseNet differently.
+torch==2.7.1
+torchvision==0.22.1
 
-# Needed by ml/tabular.py
-scikit-learn>=1.3.0
-xgboost
+# Needed by ml/tabular.py. Pinned: the .joblib files were saved with 1.6.1 and other versions
+# may refuse to open them (1.3 does).
+scikit-learn==1.6.1
+xgboost>=3; sys_platform != "linux"
+xgboost-cpu>=3; sys_platform == "linux"
 joblib
 pandas
 h5py

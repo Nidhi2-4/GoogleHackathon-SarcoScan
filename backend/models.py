@@ -31,6 +31,8 @@ def now() -> datetime:
 class Role(str, enum.Enum):
     admin = "admin"
     doctor = "doctor"
+    # Retired on 2026-10-10: doctors do the whole screening. Kept only so old rows still load; these
+    # accounts are switched off at startup (db.upgrade_schema) and no endpoint accepts the role.
     technician = "technician"
 
 
@@ -79,16 +81,6 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class RefreshToken(Base):
-    __tablename__ = "refresh_tokens"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
-
-
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -105,6 +97,9 @@ class Patient(Base):
     consent_given: Mapped[bool] = mapped_column(Boolean)
     consent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    # The doctor whose patient this is. Only that doctor sees and changes the record; an admin may read it.
+    # Empty only for patients registered before 2026-10-10 by someone who was not a doctor.
+    doctor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

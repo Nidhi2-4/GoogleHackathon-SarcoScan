@@ -1,10 +1,7 @@
-# ==============================================================================
-# SarcoScan (.gitignore) - Security & Privacy Rules
-# Ensures PHI (Protected Health Information), credentials, model weights, 
-# and local environments are NEVER pushed to GitHub.
-# ==============================================================================
+# SarcoScan: what never goes into git.
+# Patient data, secrets and local environments stay on the machine that made them.
 
-# --- 1. Secrets, Credentials & Environment Files ---
+# --- Secrets and environment files (.env.example is the only one committed) ---
 .env
 .env.*
 !.env.example
@@ -22,10 +19,10 @@ credentials.json
 client_secret*.json
 service_account*.json
 token.json
-infra/nginx/certs/
-infra/**/certs/
+# Anish's notes of the live credentials (database, Cloudinary, seed passwords)
+cred.md
 
-# --- 2. Patient Data & Medical Imaging (PHI - Strictly Prohibited) ---
+# --- Patient data and medical images ---
 *.dcm
 *.dicom
 *.nii
@@ -35,16 +32,27 @@ infra/**/certs/
 *.nrrd
 *.svs
 uploads/
-reports/
-storage/
 **/uploads/
+reports/
 **/reports/
+storage/
 **/patient_data/
 **/phi/
-ml/data/
 data/
+ml/data/
 
-# --- 3. Large Machine Learning Model Weights & Checkpoints ---
+# --- Databases ---
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql
+*.sql.gz
+
+# --- Model files ---
+# Weights and checkpoints are ignored everywhere, except the final models the API loads
+# from ml/models/ (committed on purpose so the hosted API can load them). Training
+# checkpoints (*_last.pt) stay out even there.
 *.onnx
 *.pt
 *.pth
@@ -55,53 +63,36 @@ data/
 *.bin
 *.safetensors
 *.weights
-ml/models/
+!ml/models/*.pt
+!ml/models/*.joblib
+ml/models/*_last.pt
 ml/runs/
 mlruns/
 wandb/
 .tensorboard/
 
-# --- 4. Database, Object Storage & Docker Volumes ---
-*.sqlite
-*.sqlite3
-*.db
-*.dump
-*.sql
-*.sql.gz
-pgdata/
-minio-data/
-orthanc-db/
-redis-data/
-infra/**/data/
-docker-volumes/
-
-# --- 5. Node.js, Next.js & Frontend Artifacts ---
+# --- Node, Next.js, Expo (frontend/web, frontend/mobile) ---
 node_modules/
-**/node_modules/
 .next/
-**/.next/
 out/
 dist/
 build/
 coverage/
 .expo/
-**/.expo/
 web-build/
+.vercel/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.vercel/
 *.apk
 *.aab
 *.ipa
 
-# --- 6. Python, FastAPI & ML Environment ---
+# --- Python ---
 __pycache__/
-**/__pycache__/
 *.py[cod]
-*$py.class
 .venv/
 venv/
 env/
@@ -113,36 +104,26 @@ ENV/
 .coverage
 htmlcov/
 .ipynb_checkpoints/
-celerybeat-schedule*
 
-# --- 7. Embedded Firmware (ESP32 / PlatformIO / Arduino) ---
-.pio/
-firmware/**/build/
-firmware/**/.pio/
-firmware/**/.vscode/
-
-# --- 8. Operating System & Local IDE Files ---
+# --- Operating system and editors ---
 *.log
 logs/
 .DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+ehthumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
 *.swp
 *.swo
 
-# --- 9. AI Assistant Local Metadata ---
+# --- AI assistants' local files ---
 .gemini/
 .claude/settings.local.json
 
-# --- 10. Exceptions: app source folders that share a name with ignored data dirs ---
-# (e.g. the Next.js route src/app/reports/). Real patient files never live under src/.
+# --- Source folders that share a name with an ignored data folder above ---
+# (for example the Next.js route src/app/reports/). Real patient files never live under src/.
 !frontend/*/src/**/reports/
 !frontend/*/src/**/uploads/
 !frontend/*/src/**/data/

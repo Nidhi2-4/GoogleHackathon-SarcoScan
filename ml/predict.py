@@ -6,14 +6,18 @@ The weight files are not in git: copy osteoporosis_best.pt and arthritis_best.pt
 """
 from pathlib import Path
 
-import torch
-import torchvision
-from PIL import Image
-from torchvision import transforms
-
-from . import muscle
-
 MODELS = Path(__file__).parent / "models"
+for _name in ("osteoporosis_best.pt", "arthritis_best.pt"):
+    if not (MODELS / _name).exists():  # checked before importing torch, which alone takes about 200 MB
+        raise FileNotFoundError(f"ml/models/{_name} is missing")
+
+import torch  # noqa: E402
+import torchvision  # noqa: E402
+from PIL import Image  # noqa: E402
+from torchvision import transforms  # noqa: E402
+
+from . import muscle  # noqa: E402
+
 MODEL_VERSION = "osteo-densenet121-0.1+kl-densenet121-0.1"
 
 # Same steps as eval_tf and load_xray in ml/training/train_osteoporosis.py and train_arthritis.py.

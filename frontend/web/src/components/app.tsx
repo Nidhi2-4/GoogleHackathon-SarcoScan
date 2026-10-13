@@ -29,11 +29,13 @@ const ratio = (x: number | null) => (x === null ? "Not available" : x.toFixed(2)
 
 /** Whether the backend has an ML model. Shown wherever a result depends on it. */
 export function ModelStatus() {
-  const { modelConnected } = useStore();
+  const { modelConnected, tabularConnected } = useStore();
   if (modelConnected === null) return null;
+  // The hosted API has memory for the measurement models only (docs/DEPLOY.md), so say which part runs.
+  const label = modelConnected ? "connected" : tabularConnected ? "measurements only, no X-ray model" : "not connected";
   return (
     <span className={`badge ${modelConnected ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-      AI model: {modelConnected ? "connected" : "not connected"}
+      AI model: {label}
     </span>
   );
 }

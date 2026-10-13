@@ -1,25 +1,21 @@
-"""Passwords, tokens, role checks, the audit log, and the login rate limit."""
-import hashlib
+"""Passwords, the login token, role checks, and the audit log."""
 import secrets
-import time
 import uuid
-from collections import defaultdict, deque
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .db import get_db
-from .models import AuditLog, RefreshToken, Role, User, now
+from .db import get_db, get_or_404
+from .models import AuditLog, Patient, Role, User, Visit, now
 
-STAFF = (Role.technician, Role.doctor, Role.admin)
-SCREENERS = (Role.technician, Role.doctor)
+# Who may read patient data. Only a doctor writes it, and only for their own patients (see own_patient).
+STAFF = (Role.doctor, Role.admin)
 
 _hasher = PasswordHasher()
 # Checked when the email is unknown, so a wrong email takes as long as a wrong password.
@@ -51,9 +47,8 @@ def create_access_token(user: User) -> str:
     claims = {
         "sub": str(user.id),
         "role": user.role.value,
-        "type": "access",
         "iat": issued,
-        "exp": issued + timedelta(minutes=settings.access_minutes),
+        "exp": issued + timedelta(days=settings.token_days),
     }
     return jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
 
@@ -69,8 +64,6 @@ def current_user(
         user_id = uuid.UUID(claims["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise _not_logged_in() from None
-    if claims.get("type") != "access":
-        raise _not_logged_in()
     # The role is taken from the user's row, so a deactivated or demoted user loses access at once.
     user = db.get(User, user_id)
     if user is None or not user.is_active:
@@ -89,46 +82,22 @@ def require_roles(*roles: Role):
     return check
 
 
-def _token_hash(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
+def own_patient(db: Session, user: User, patient_id: uuid.UUID) -> Patient:
+    """The patient, if this user may see them: their own doctor, or an admin (read only).
+    Anyone else gets the same 404 as for a missing patient, so other doctors' patients stay invisible."""
+    patient = get_or_404(db, Patient, patient_id, "patient")
+    if user.role != Role.admin and patient.doctor_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such patient")
+    return patient
 
 
-def _as_utc(moment: datetime) -> datetime:
-    # SQLite returns naive datetimes; PostgreSQL returns aware ones.
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
-
-
-def issue_refresh_token(db: Session, user: User) -> str:
-    token = secrets.token_urlsafe(48)
-    db.add(
-        RefreshToken(
-            user_id=user.id,
-            token_hash=_token_hash(token),
-            expires_at=now() + timedelta(days=settings.refresh_days),
-        )
-    )
-    return token
-
-
-def rotate_refresh_token(db: Session, token: str) -> tuple[User, str]:
-    """Swap a valid refresh token for a new one. The caller commits."""
-    row = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == _token_hash(token)))
-    if row is None:
-        raise _not_logged_in()
-    if row.revoked:
-        # A used token came back, so it may have been stolen. Sign the user out everywhere.
-        db.execute(update(RefreshToken).where(RefreshToken.user_id == row.user_id).values(revoked=True))
-        db.commit()
-        raise _not_logged_in()
-    user = db.get(User, row.user_id)
-    if _as_utc(row.expires_at) < now() or user is None or not user.is_active:
-        raise _not_logged_in()
-    row.revoked = True
-    return user, issue_refresh_token(db, user)
-
-
-def revoke_refresh_token(db: Session, token: str) -> None:
-    db.execute(update(RefreshToken).where(RefreshToken.token_hash == _token_hash(token)).values(revoked=True))
+def own_visit(db: Session, user: User, visit_id: uuid.UUID) -> tuple[Visit, Patient]:
+    """The visit and its patient, under the same rule as own_patient."""
+    visit = get_or_404(db, Visit, visit_id, "visit")
+    try:
+        return visit, own_patient(db, user, visit.patient_id)
+    except HTTPException:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such visit") from None
 
 
 def client_ip(request: Request) -> str:
@@ -152,18 +121,3 @@ class Audit:
         self.db.add(
             AuditLog(user_id=user.id, action=action, entity_type=entity_type, entity_id=entity_id, ip_address=self.ip)
         )
-
-
-_login_attempts: dict[str, deque[float]] = defaultdict(deque)
-
-
-def limit_login(request: Request) -> None:
-    """Dependency: at most 5 login attempts per minute from one address."""
-    # ponytail: kept in memory, per process. Move to Redis if the API runs with more than one worker.
-    attempts = _login_attempts[client_ip(request)]
-    cutoff = time.monotonic() - 60
-    while attempts and attempts[0] < cutoff:
-        attempts.popleft()
-    if len(attempts) >= 5:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many login attempts. Try again in a minute.")
-    attempts.append(time.monotonic())

@@ -1,6 +1,6 @@
 # Plan
 
-Owner: everyone. Last updated: 2026-10-04.
+Owner: everyone. Last updated: 2026-10-12.
 
 This is the task list. Tick a box when the thing works, not when it is started. Update it in the same commit as the work.
 
@@ -31,12 +31,13 @@ M1 comes before making any single piece good. Joining the parts on the last day 
 Ticked items pass the tests in `backend/tests/` on SQLite.
 
 - [x] FastAPI confirmed as the backend framework
-- [ ] First commit and push (M0)
+- [x] First commit and push (M0)
 - [x] The API run against PostgreSQL (the Supabase development database)
 - [x] `.env.example` written
 - [x] The 9 tables in `DATABASE.md`
-- [x] Auth: argon2, login, refresh with rotation, logout, me
-- [x] Seed script: one admin, one doctor, one technician
+- [x] Auth: argon2, signup, login, me (one 7-day token; simplified on 2026-10-12 for the test build)
+- [ ] Before real patient data: tighten login again (`SECURITY.md`, "Before real patient data")
+- [x] Seed script: one admin, one doctor
 - [x] Shared role dependency and audit dependency
 - [x] Patient endpoints
 - [x] Visit, clinical inputs, and grip endpoints
@@ -49,7 +50,11 @@ Ticked items pass the tests in `backend/tests/` on SQLite.
 - [x] Test: each role is refused where `SECURITY.md` says No
 - [x] Append-only triggers on `audit_logs`, checked on PostgreSQL
 - [x] Name and phone encryption, with `phone_hash` for search
-- [ ] Cloudinary copies of X-rays made private (`SECURITY.md` checklist item 17)
+- [x] One-command setup and run from the repo root (`npm run setup`, `npm run dev`, `npm start`); `npm run check` runs the CI checks locally
+- [x] API hosted on Render (root directory `backend`, the two measurement models loaded), web app on Vercel
+- [x] Row-level security on every table, so Supabase's REST API gives the anon key nothing
+- [x] Doctor and admin only; each doctor sees only their own patients, admin reads all (technician role retired)
+- [ ] Hosted X-rays only on Cloudinary, private, nothing on disk (code done; check on the live site, `SECURITY.md` item 17)
 - [ ] DICOM uploads converted to PNG (only if DICOM upload is supported)
 - [ ] `docker-compose.yml` with database, backend, and web (M3)
 

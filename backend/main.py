@@ -2,10 +2,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from sqlalchemy import inspect, text
 
 from .analysis import model_connected, tabular_connected
-from .db import Base, engine
+from . import seed, storage
+from .db import Base, engine, upgrade_schema
 from .routers import admin, auth, patients, visits
 
 
@@ -13,27 +13,8 @@ from .routers import admin, auth, patients, visits
 async def lifespan(app: FastAPI):
     # ponytail: tables are created at startup. Move to Alembic once real data has to survive a schema change.
     Base.metadata.create_all(engine)
-    if engine.dialect.name == "postgresql":
-        # ponytail: one hand-written schema fix in place of Alembic. Databases created before the phone
-        # number became optional still require it. Safe to repeat; drop this once every database has run it.
-        with engine.begin() as connection:
-            connection.execute(
-                text("ALTER TABLE patients ALTER COLUMN phone DROP NOT NULL, ALTER COLUMN phone_hash DROP NOT NULL")
-            )
-    # ponytail: create_all never adds a column to a table that already exists, so new optional
-    # columns are added here. Replace with Alembic once a change is more than "add a nullable column".
-    wanted = {
-        "visits": {"waist_cm": "FLOAT", "arm_circ_cm": "FLOAT", "history_json": "TEXT"},
-        "analysis_results": {
-            "low_muscle": "BOOLEAN", "low_muscle_prob": "FLOAT", "bone_loss": "BOOLEAN", "bone_loss_prob": "FLOAT",
-        },
-    }
-    with engine.begin() as connection:
-        for table, columns in wanted.items():
-            present = {column["name"] for column in inspect(connection).get_columns(table)}
-            for name, kind in columns.items():
-                if name not in present:
-                    connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {kind}"))
+    upgrade_schema()
+    seed.demo_doctor()  # the public demo login; remove before real patient data
     # Load all four models now (about 10 s) so the first screening does not wait for them.
     model_connected()
     tabular_connected()
@@ -41,12 +22,31 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SarcoScan API", lifespan=lifespan)
+
+# No CORS middleware on purpose: the web app forwards /api to this server, so the browser only ever
+# talks to the web app's own address. See docs/SECURITY.md, section 3.
+
 app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(visits.router)
 app.include_router(admin.router)
 
 
+@app.api_route("/", methods=["GET", "HEAD"])
+def root():
+    """This server is the API only. The web app is a separate service; say so instead of "Not Found"."""
+    return {"service": "SarcoScan API", "health": "/api/v1/health", "note": "Open the web app, not this address."}
+
+
+@app.api_route("/api/v1/ping", methods=["GET", "HEAD"])
+def ping():
+    """For uptime monitors. Answers HEAD as well as GET, and touches neither the database nor the models."""
+    return {"status": "ok"}
+
+
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "model_connected": model_connected(), "tabular_connected": tabular_connected()}
+    return {
+        "status": "ok", "model_connected": model_connected(), "tabular_connected": tabular_connected(),
+        "storage": storage.backend(),
+    }

@@ -86,7 +86,7 @@ export default function AboutPage() {
             </div>
             <h3 className="font-bold text-base text-slate-900">Data Ingestion</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Technician registers patient, enters 3 handgrip trials per hand, and uploads standard knee AP DICOM or image.
+              The doctor registers the patient, enters 3 handgrip trials per hand, and uploads a knee AP X-ray as PNG or JPG.
             </p>
           </div>
 

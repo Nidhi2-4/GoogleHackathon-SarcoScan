@@ -1,6 +1,6 @@
 # Pitch and demo
 
-Owner: Soham. Last updated: 2026-10-04.
+Owner: Soham. Last updated: 2026-10-10.
 
 Status: the deck is `HackPulse - Codesharks.pdf` in this folder (9 slides). This file holds the rules for what it may claim, and a review of the current version.
 
@@ -60,7 +60,7 @@ Read the abstract and quote the paper's own numbers. Note the difference when ci
 
 Run it in this order. Each step should take a few seconds.
 
-1. Log in as a technician.
+1. Log in as the demo doctor (one click on the sign-in page).
 2. Search for a patient, then register a new one.
 3. Start a screening. Enter clinical inputs.
 4. Enter handgrip trials. Show the best value marked against the cutoff.
@@ -69,7 +69,7 @@ Run it in this order. Each step should take a few seconds.
 7. Download the report.
 8. Open the patient's history and show the trend graph.
 9. Open the same screen on a phone, and as an installed desktop app.
-10. Log in as a role that is not allowed to do something, and show it being refused.
+10. Log in as the admin: every patient can be read, nothing can be changed. Each doctor sees only their own patients.
 
 ## Before the day
 

@@ -45,7 +45,7 @@ export default function TermsAndConditionsPage() {
             1. Acceptance of Terms
           </h2>
           <p>
-            By accessing or operating the SarcoScan web portal, technician dynamometer client, or automated inference pipeline, medical institutions, technicians, and clinicians agree to abide by these terms of use.
+            By accessing or operating the SarcoScan web portal or its automated inference pipeline, medical institutions and clinicians agree to abide by these terms of use.
           </p>
         </section>
 
@@ -55,8 +55,7 @@ export default function TermsAndConditionsPage() {
           </h2>
           <p>The platform provides distinct interfaces for verified operational roles:</p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Radiology Technicians & Nurses:</strong> Responsible for verifying patient positioning during knee AP X-ray acquisition and ensuring proper dynamometer calibration.</li>
-            <li><strong>Orthopedic & Geriatric Clinicians:</strong> Responsible for reviewing AI-generated segmentations, evaluating confidence intervals, and applying independent clinical judgment before making diagnostic referrals.</li>
+            <li><strong>Orthopedic & Geriatric Clinicians:</strong> Responsible for correct patient positioning on the knee AP X-ray, accurate handgrip entry, reviewing AI-generated segmentations, evaluating confidence intervals, and applying independent clinical judgment before making diagnostic referrals.</li>
             <li><strong>Hospital Administrators:</strong> Responsible for local server security, user access revocation, and backup integrity.</li>
           </ul>
         </section>

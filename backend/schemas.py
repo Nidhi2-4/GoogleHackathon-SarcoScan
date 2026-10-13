@@ -1,7 +1,7 @@
 """Request and response shapes. FastAPI shows them at /docs."""
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -26,6 +26,26 @@ class UserOut(BaseModel):
     name: str
     email: str
     role: Role
+
+
+class SignupIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    # ponytail: any non-empty password while this is a test build. Ask for 8 or more before real use.
+    password: str = Field(min_length=1, max_length=200)
+
+
+class UserIn(SignupIn):
+    role: Literal[Role.doctor, Role.admin]  # the technician role is retired
+
+
+class UserAdminOut(UserOut):
+    is_active: bool
+    last_login_at: datetime | None
+
+
+class UserActiveIn(BaseModel):
+    is_active: bool
 
 
 class PatientIn(BaseModel):

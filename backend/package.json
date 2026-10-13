@@ -1,0 +1,9 @@
+{
+  "name": "sarcoscan-api",
+  "private": true,
+  "description": "For hosts whose root directory is backend/ (Render). Locally, use the commands in the repo root.",
+  "scripts": {
+    "build": "pip install -r requirements.txt",
+    "start": "node ../scripts/run.mjs start"
+  }
+}

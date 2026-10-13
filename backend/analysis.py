@@ -1,12 +1,20 @@
-"""Cutoffs, the sarcopenia stage rule, and the call into the ML code. See docs/ML.md."""
+"""Cutoffs, the sarcopenia stage rule, and the calls into the models in ml/. See docs/ML.md."""
 import logging
+import os
 from pathlib import Path
 
 from .models import Stage
 
 log = logging.getLogger(__name__)
 
-# AWGS 2019.
+# Which model groups to load: "xray" (ml/predict.py) and "tabular" (ml/tabular.py). Together they
+# need more than 512 MB, so a small server can switch one or both off: SARCOSCAN_MODELS=xray,
+# =tabular, or =none. The app then says what is not connected and still runs.
+_ENABLED = {name.strip() for name in os.environ.get("SARCOSCAN_MODELS", "xray,tabular").split(",")}
+
+
+# ── AWGS 2019 cutoffs and the stage rule ──
+
 GRIP_CUTOFF_KG = {"male": 28.0, "female": 18.0}
 CHAIR_STAND_SLOW_SEC = 12.0
 SARCF_POSITIVE = 4
@@ -21,7 +29,7 @@ def grip_cutoff(sex: str) -> float:
 def sarcopenia_stage(
     sex: str, grip_kg: float | None, chair_stand_sec: float | None, low_muscle: bool | None
 ) -> Stage:
-    """The rule in docs/ML.md. low_muscle is None when no image measurement exists."""
+    """The rule in docs/ML.md. low_muscle is None when neither the X-ray nor the tabular model gave one."""
     low_grip = grip_kg is not None and grip_kg < grip_cutoff(sex)
     slow = chair_stand_sec is not None and chair_stand_sec >= CHAIR_STAND_SLOW_SEC
     if not (low_grip or slow):
@@ -31,19 +39,37 @@ def sarcopenia_stage(
     return Stage.severe if (low_grip and slow) else Stage.probable
 
 
-def _model():
-    """ml.predict.analyze, or None when it cannot load on this machine:
-    torch is not installed, or the weight files are not in ml/models/ (they are not in git)."""
+# ── X-ray models: ml/predict.py ──
+
+
+def _xray_analyze():
+    """ml.predict.analyze, or None when it is switched off or cannot load (torch or a weight file missing)."""
+    if "xray" not in _ENABLED:
+        return None
     try:
         from ml.predict import analyze
     except (ImportError, FileNotFoundError) as error:
-        log.warning("AI model not connected: %s", error)
+        log.warning("X-ray models not connected: %s", error)
         return None
     return analyze
 
 
+def model_connected() -> bool:
+    return _xray_analyze() is not None
+
+
+def run_model(image_path: Path, age: int, sex: str, bmi: float) -> dict:
+    """Call ml/predict.py. Returns {} when the X-ray models are not connected."""
+    analyze = _xray_analyze()
+    if analyze is None:
+        return {}
+    return analyze(image_path=str(image_path), age=age, sex=sex, bmi=bmi)
+
+
+# ── Body-measurement models: ml/tabular.py ──
+
 # The yes or no questions of the bone-loss model (ml/tabular.py HISTORY). Kept here as well so the
-# API can check the keys without loading the model; a test compares the two lists.
+# API can check the keys without loading the model; `python -m ml.tabular` compares the two lists.
 HISTORY_QUESTIONS = (
     "diabetes", "prediabetes", "hypertension", "high_cholesterol", "arthritis", "heart_failure",
     "coronary_heart_disease", "heart_attack", "stroke", "liver_condition", "cancer", "gout", "weak_kidneys",
@@ -52,21 +78,33 @@ HISTORY_QUESTIONS = (
 )
 
 
+def _tabular():
+    """The ml.tabular module, or None when it is switched off or cannot load."""
+    if "tabular" not in _ENABLED:
+        return None
+    try:
+        from ml import tabular
+    except (ImportError, FileNotFoundError) as error:
+        log.warning("Tabular models not connected: %s", error)
+        return None
+    return tabular
+
+
+def tabular_connected() -> bool:
+    return _tabular() is not None
+
+
 def run_tabular_models(
     age: int, sex: str, height_cm: float, weight_kg: float, bmi: float,
     waist_cm: float | None, arm_circ_cm: float | None, best_left: float | None, best_right: float | None,
     history: dict[str, bool] | None,
 ) -> dict:
     """The two models in ml/tabular.py: low_muscle, low_muscle_prob, bone_loss, bone_loss_prob.
-    Returns {} when they cannot load on this machine or no grip reading exists.
+    Returns {} when they are not connected or no grip reading exists.
     Anything not measured is passed as None and the model fills it in."""
     grips = [g for g in (best_left, best_right) if g is not None]
-    if not grips:
-        return {}
-    try:
-        from ml import tabular
-    except (ImportError, FileNotFoundError) as error:
-        log.warning("Tabular models not connected: %s", error)
+    tabular = _tabular() if grips else None
+    if tabular is None:
         return {}
     body = dict(
         age=age,
@@ -93,25 +131,3 @@ def run_tabular_models(
         "bone_loss": bone["bone_loss"],
         "bone_loss_prob": bone["probability"],
     }
-
-
-def model_connected() -> bool:
-    return _model() is not None
-
-
-def tabular_connected() -> bool:
-    """True when the two body-measurement models load on this machine."""
-    try:
-        from ml import tabular  # noqa: F401
-    except (ImportError, FileNotFoundError) as error:
-        log.warning("Tabular models not connected: %s", error)
-        return False
-    return True
-
-
-def run_model(image_path: Path, age: int, sex: str, bmi: float) -> dict:
-    """Call ml/predict.py. Returns {} when the model is not connected."""
-    analyze = _model()
-    if analyze is None:
-        return {}
-    return analyze(image_path=str(image_path), age=age, sex=sex, bmi=bmi)
