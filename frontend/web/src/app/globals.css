@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg-base: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f1f5f9;
+  --color-accent-sky: #e0f2fe;
+  --color-accent-blue-light: #bae6fd;
+  --color-accent-blue: #0284c7;
+  --color-accent-blue-dark: #0369a1;
+  --color-accent-indigo: #1d4ed8;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-border-blue: #bfdbfe;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* Custom Skeleton Shimmer Animation - Ice Blue Theme */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e0f2fe 40%,
+    #f1f5f9 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite ease-in-out;
+}
+
+/* Glassmorphism styling */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(191, 219, 254, 0.8);
+}
+
+.glass-panel-blue {
+  background: rgba(224, 242, 254, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(186, 230, 253, 0.7);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #93c5fd;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
+}
+
+/* Clinical app building blocks, so pages stay light on wrapper tags and class lists */
+@layer components {
+  .card {
+    @apply rounded-xl border border-[#e2e8f0] bg-white p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#0284c7] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0369a1] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#bfdbfe] bg-white px-4 py-2 text-sm font-semibold text-[#0f172a] transition-colors hover:bg-[#e0f2fe] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .input {
+    @apply mt-1 block w-full rounded-lg border border-[#bfdbfe] bg-white px-3 py-2 text-sm font-normal text-[#0f172a] outline-none focus:border-[#0284c7] focus:ring-2 focus:ring-[#bae6fd];
+  }
+  .label {
+    @apply block text-sm font-medium text-[#334155];
+  }
+  .badge {
+    @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap;
+  }
+  .table {
+    @apply w-full text-left text-sm;
+  }
+  .table th {
+    @apply border-b border-[#e2e8f0] px-3 py-2 text-xs font-semibold tracking-wider text-[#64748b] uppercase;
+  }
+  .table td {
+    @apply border-b border-[#e2e8f0] px-3 py-2.5;
+  }
+  .h1 {
+    @apply text-2xl font-bold tracking-tight;
+  }
+  .h2 {
+    @apply mb-3 text-sm font-semibold tracking-wider text-[#334155] uppercase;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
