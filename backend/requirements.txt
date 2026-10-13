@@ -1,0 +1,29 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+argon2-cffi>=23.1
+pyjwt>=2.8
+cryptography>=42
+python-dotenv>=1.0
+python-multipart>=0.0.9
+pillow>=10
+
+# tests
+pytest>=8
+httpx2>=2
+
+# Needed by ml/predict.py
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Needed by ml/tabular.py
+scikit-learn>=1.3.0
+xgboost
+joblib
+pandas
+h5py
+scipy  # ml/muscle.py
+
+# Optional private copy of uploads when STORAGE_BACKEND=cloudinary.
+cloudinary

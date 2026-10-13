@@ -1,0 +1,150 @@
+# ==============================================================================
+# SarcoScan (.gitignore) - Security & Privacy Rules
+# Ensures PHI (Protected Health Information), credentials, model weights, 
+# and local environments are NEVER pushed to GitHub.
+# ==============================================================================
+
+# --- 1. Secrets, Credentials & Environment Files ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.p8
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.secret
+credentials.json
+client_secret*.json
+service_account*.json
+token.json
+infra/nginx/certs/
+infra/**/certs/
+
+# --- 2. Patient Data & Medical Imaging (PHI - Strictly Prohibited) ---
+*.dcm
+*.dicom
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.nrrd
+*.svs
+uploads/
+reports/
+storage/
+**/uploads/
+**/reports/
+**/patient_data/
+**/phi/
+ml/data/
+data/
+
+# --- 3. Large Machine Learning Model Weights & Checkpoints ---
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.joblib
+*.h5
+*.bin
+*.safetensors
+*.weights
+ml/models/
+ml/runs/
+mlruns/
+wandb/
+.tensorboard/
+
+# --- 4. Database, Object Storage & Docker Volumes ---
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+*.sql.gz
+pgdata/
+minio-data/
+orthanc-db/
+redis-data/
+infra/**/data/
+docker-volumes/
+
+# --- 5. Node.js, Next.js & Frontend Artifacts ---
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+build/
+coverage/
+.expo/
+**/.expo/
+web-build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.vercel/
+*.apk
+*.aab
+*.ipa
+
+# --- 6. Python, FastAPI & ML Environment ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+celerybeat-schedule*
+
+# --- 7. Embedded Firmware (ESP32 / PlatformIO / Arduino) ---
+.pio/
+firmware/**/build/
+firmware/**/.pio/
+firmware/**/.vscode/
+
+# --- 8. Operating System & Local IDE Files ---
+*.log
+logs/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# --- 9. AI Assistant Local Metadata ---
+.gemini/
+.claude/settings.local.json
+
+# --- 10. Exceptions: app source folders that share a name with ignored data dirs ---
+# (e.g. the Next.js route src/app/reports/). Real patient files never live under src/.
+!frontend/*/src/**/reports/
+!frontend/*/src/**/uploads/
+!frontend/*/src/**/data/
+!frontend/*/src/**/storage/
+!ml/reports/
