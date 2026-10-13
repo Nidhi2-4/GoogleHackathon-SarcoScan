@@ -18,8 +18,12 @@ import {
   UsersIcon,
   FileTextIcon,
   InfoIcon,
+  FlameIcon,
+  LayersIcon,
 } from "@/components/Icons";
 import { Skeleton, PatientReportSkeleton } from "@/components/ui/Skeleton";
+import { AIProcessingVisualizer } from "@/components/AIProcessingVisualizer";
+import { DiagnosticHeatmap } from "@/components/DiagnosticHeatmap";
 
 // Preset Sample Knee AP X-Rays for quick testing
 const CLINICAL_PRESETS = [
@@ -212,11 +216,10 @@ export default function DemoPage() {
     }
   };
 
+  const activeImage = uploadedImage || "/samples/sample_knee_left.jpg";
+
   const triggerFastInference = () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 350);
   };
 
   const handleUpdateTrial = (hand: "left" | "right", index: number, value: number) => {
@@ -378,37 +381,74 @@ export default function DemoPage() {
                 </div>
               </div>
             ) : (
-              /* Preset Selection Cards */
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {CLINICAL_PRESETS.map((preset) => {
-                  const isSelected = selectedPreset.id === preset.id;
-                  return (
+              /* Preset Selection Cards & Ingested X-Ray Preview */
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {CLINICAL_PRESETS.map((preset) => {
+                    const isSelected = selectedPreset.id === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={`p-4 rounded-2xl border text-left transition-all relative ${
+                          isSelected
+                            ? "bg-sky-50/70 border-sky-500 ring-2 ring-sky-500/20 shadow-md"
+                            : "bg-white border-slate-200 hover:border-sky-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-900">{preset.title}</span>
+                          {isSelected && (
+                            <span className="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-bold">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-600 mb-2">{preset.description}</p>
+                        <div className="text-[11px] text-slate-500 flex justify-between border-t border-slate-100 pt-2">
+                          <span>Age: {preset.age}y ({preset.sex})</span>
+                          <span className="font-semibold text-slate-700">Grip: {preset.gripStrength} kg</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Preset Ingested X-Ray Quality & Segment Preview */}
+                <div className="p-4 rounded-2xl bg-sky-50/50 border border-sky-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black border border-slate-300 shrink-0 shadow-sm">
+                      <img
+                        src="/samples/sample_knee_left.jpg"
+                        alt="Preset Knee AP Radiograph"
+                        className="w-full h-full object-contain"
+                      />
+                      <div className="absolute inset-0 bg-sky-500/20 pointer-events-none" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">{selectedPreset.title} · Active Radiograph</span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">QC Validated</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">{selectedPreset.xrayType}</p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        • Thigh soft-tissue to bone ratio: <strong>{softTissueRatio}</strong> · Tibial plateau landmark aligned
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
-                      key={preset.id}
                       type="button"
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`p-4 rounded-2xl border text-left transition-all relative ${
-                        isSelected
-                          ? "bg-sky-50/70 border-sky-500 ring-2 ring-sky-500/20 shadow-md"
-                          : "bg-white border-slate-200 hover:border-sky-300 hover:bg-slate-50"
-                      }`}
+                      onClick={() => triggerFastInference()}
+                      className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-900">{preset.title}</span>
-                        {isSelected && (
-                          <span className="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-bold">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-600 mb-2">{preset.description}</p>
-                      <div className="text-[11px] text-slate-500 flex justify-between border-t border-slate-100 pt-2">
-                        <span>Age: {preset.age}y ({preset.sex})</span>
-                        <span className="font-semibold text-slate-700">Grip: {preset.gripStrength} kg</span>
-                      </div>
+                      <RefreshCwIcon className="w-3.5 h-3.5" />
+                      <span>Simulate Inference</span>
                     </button>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -607,7 +647,17 @@ export default function DemoPage() {
               </div>
 
               {isLoading ? (
-                <PatientReportSkeleton />
+                <div className="space-y-4">
+                  <AIProcessingVisualizer
+                    isProcessing={isLoading}
+                    imageSrc={activeImage}
+                    onComplete={() => setIsLoading(false)}
+                    onSkip={() => setIsLoading(false)}
+                    durationMs={2200}
+                    isModal={false}
+                  />
+                  <PatientReportSkeleton />
+                </div>
               ) : (
                 <div className="space-y-4">
                   {/* Primary Sarcopenia Tier Card */}
@@ -753,6 +803,33 @@ export default function DemoPage() {
             </div>
           </div>
         </div>
+
+        {/* 3. STEP 3: INTERACTIVE AI HEATMAP EXPLAINABILITY & BIOMARKER STUDIO */}
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-600">
+                Diagnostic Explainability &amp; Visual Saliency
+              </span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                Anatomical Heatmaps &amp; Feature Attribution
+              </h2>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Interactive ROI Spotlight &amp; A/B Split Comparison</span>
+            </div>
+          </div>
+
+          <DiagnosticHeatmap
+            imageSrc={activeImage}
+            patientName={patientName}
+            stage={doctorOverride ? overrideStage : computedSarcopeniaStage}
+            riskScore={computedSarcopeniaScore}
+            softTissueRatio={softTissueRatio}
+            osteoRisk={computedOsteoRisk}
+          />
+        </section>
 
       </div>
     </div>

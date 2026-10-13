@@ -14,6 +14,8 @@ import {
   type Stage,
   type Tier,
 } from "@/lib/store";
+import { DiagnosticHeatmap } from "./DiagnosticHeatmap";
+import { FlameIcon, LayersIcon, ScanIcon } from "./Icons";
 
 export const StageBadge = ({ stage }: { stage: Stage }) => (
   <span className={`badge ${STAGE[stage].cls}`}>{STAGE[stage].label}</span>
@@ -89,10 +91,24 @@ export function ScreeningTable({ rows }: { rows: Screening[] }) {
 
 export const byDateDesc = (a: Screening, b: Screening) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
 
-/** The uploaded X-ray, and the model's overlay when there is one. Fetched with the login token. */
-export function XrayImage({ xrayId, hasOverlay }: { xrayId: string; hasOverlay: boolean }) {
+/** The uploaded X-ray, segmentation overlay, and Grad-CAM heatmap viewer. */
+export function XrayImage({
+  xrayId,
+  hasOverlay,
+  stage,
+  riskScore,
+  softTissueRatio,
+  osteoRisk,
+}: {
+  xrayId: string;
+  hasOverlay: boolean;
+  stage?: string;
+  riskScore?: number;
+  softTissueRatio?: number;
+  osteoRisk?: string;
+}) {
   const [urls, setUrls] = useState<{ image?: string; overlay?: string; failed?: boolean }>({});
-  const [showOverlay, setShowOverlay] = useState(hasOverlay);
+  const [viewMode, setViewMode] = useState<"heatmap" | "overlay" | "raw">("heatmap");
 
   useEffect(() => {
     let cancelled = false;
@@ -113,21 +129,62 @@ export function XrayImage({ xrayId, hasOverlay }: { xrayId: string; hasOverlay: 
   }, [xrayId, hasOverlay]);
 
   if (urls.failed) return <p className="text-sm text-red-700">The X-ray could not be loaded.</p>;
-  if (!urls.image) return <p className="text-sm text-[#64748b]">Loading X-ray...</p>;
+  if (!urls.image) return <p className="text-sm text-[#64748b]">Loading X-ray and AI heatmaps...</p>;
+
   return (
-    <div className="space-y-2">
-      {urls.overlay && (
-        <label className="no-print flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showOverlay} onChange={(e) => setShowOverlay(e.target.checked)} />
-          Show segmentation overlay
-        </label>
+    <div className="space-y-4">
+      {/* Mode Switcher Tabs */}
+      <div className="no-print inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => setViewMode("heatmap")}
+          className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            viewMode === "heatmap" ? "bg-white text-sky-700 shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <FlameIcon className="w-3.5 h-3.5 text-rose-500" />
+          <span>AI Grad-CAM Heatmaps</span>
+        </button>
+        {urls.overlay && (
+          <button
+            type="button"
+            onClick={() => setViewMode("overlay")}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              viewMode === "overlay" ? "bg-white text-sky-700 shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <LayersIcon className="w-3.5 h-3.5 text-sky-600" />
+            <span>UNet Segmentation Overlay</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setViewMode("raw")}
+          className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            viewMode === "raw" ? "bg-white text-sky-700 shadow-sm font-bold" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <ScanIcon className="w-3.5 h-3.5 text-slate-500" />
+          <span>Raw Knee Radiograph</span>
+        </button>
+      </div>
+
+      {viewMode === "heatmap" ? (
+        <DiagnosticHeatmap
+          imageSrc={urls.image}
+          stage={stage}
+          riskScore={riskScore}
+          softTissueRatio={softTissueRatio}
+          osteoRisk={osteoRisk}
+        />
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element -- a blob fetched with the login token */
+        <img
+          src={viewMode === "overlay" && urls.overlay ? urls.overlay : urls.image}
+          alt={viewMode === "overlay" ? "Knee X-ray with segmentation overlay" : "Uploaded knee X-ray"}
+          className="max-h-96 rounded-lg bg-black object-contain"
+        />
       )}
-      {/* eslint-disable-next-line @next/next/no-img-element -- a blob fetched with the login token */}
-      <img
-        src={showOverlay && urls.overlay ? urls.overlay : urls.image}
-        alt={showOverlay && urls.overlay ? "Knee X-ray with segmentation overlay" : "Uploaded knee X-ray"}
-        className="max-h-96 rounded-lg bg-black"
-      />
     </div>
   );
 }

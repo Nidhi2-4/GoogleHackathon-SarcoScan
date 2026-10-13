@@ -258,28 +258,36 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-md space-y-4 relative">
-              <span className="text-4xl font-black text-sky-600">01</span>
-              <h3 className="text-xl font-bold text-slate-900">Knee AP Segmentation</h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                UNet model segments thigh muscle vs. cortical bone to extract the soft-tissue-to-bone ratio and proximal tibia trabecular proxy without extra radiation.
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-3 relative">
+              <span className="text-3xl font-black text-sky-600">01</span>
+              <h3 className="text-lg font-bold text-slate-900">Knee Segmentation</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                UNet model segments thigh muscle vs. cortical bone to extract the soft-tissue-to-bone ratio and proximal tibia trabecular proxy.
               </p>
             </div>
 
-            <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-md space-y-4 relative">
-              <span className="text-4xl font-black text-sky-600">02</span>
-              <h3 className="text-xl font-bold text-slate-900">10-Sec Handgrip Intake</h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                A 3-trial digital dynamometer test captures peak physical muscle force, immediately mapped against sex-specific AWGS 2019 cutoff thresholds.
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-3 relative">
+              <span className="text-3xl font-black text-sky-600">02</span>
+              <h3 className="text-lg font-bold text-slate-900">10-Sec Handgrip</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                A 3-trial digital dynamometer test captures peak muscle force, mapped against sex-specific AWGS 2019 cutoff thresholds.
               </p>
             </div>
 
-            <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-md space-y-4 relative">
-              <span className="text-4xl font-black text-sky-600">03</span>
-              <h3 className="text-xl font-bold text-slate-900">Multimodal Fusion</h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Clinical fusion network correlates imaging features, functional strength, age, and BMI to output instant Sarcopenia and Osteoporosis risk tiers.
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-3 relative">
+              <span className="text-3xl font-black text-sky-600">03</span>
+              <h3 className="text-lg font-bold text-slate-900">Multimodal Fusion</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Fusion network correlates imaging features, functional strength, age, and BMI to output instant Sarcopenia and Osteoporosis risk tiers.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-md space-y-3 relative">
+              <span className="text-3xl font-black text-rose-500">04</span>
+              <h3 className="text-lg font-bold text-slate-900">Grad-CAM Heatmaps</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Convolutional attention heatmaps &amp; trabecular density maps explain visual biomarker attributions with interactive A/B comparison.
               </p>
             </div>
           </div>

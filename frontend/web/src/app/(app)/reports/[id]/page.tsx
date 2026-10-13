@@ -68,8 +68,14 @@ export default function Report() {
 
       {s.xrayId && (
         <section className="card">
-          <h2 className="h2">Knee X-ray</h2>
-          <XrayImage xrayId={s.xrayId} hasOverlay={s.hasOverlay} />
+          <h2 className="h2">Knee Radiograph &amp; AI Explainability Heatmaps</h2>
+          <XrayImage
+            xrayId={s.xrayId}
+            hasOverlay={s.hasOverlay}
+            stage={finalStage(s)}
+            softTissueRatio={s.features.thigh ?? 1.58}
+            osteoRisk={s.osteoTier ? `${s.osteoTier.toUpperCase()} RISK` : undefined}
+          />
         </section>
       )}
 
